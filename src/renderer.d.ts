@@ -6,9 +6,15 @@ interface AppStore {
   delete: (prop: string) => void;
 }
 
+interface RecordApi {
+  start: (options?: any) => void;
+  sendChunk: (chunk: ArrayBuffer) => void;
+  stop: () => void;
+}
+
 declare global {
   interface Window {
     appStore: AppStore
-    // you can add here APIs defined in preload.ts for autocompletion.
+    recordApi: RecordApi
   }
 }

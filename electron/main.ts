@@ -2,6 +2,7 @@ import {join as pathJoin} from 'path';
 
 import { app, BrowserWindow } from 'electron';
 import { AppStore } from './app-store';
+import { FFmpegRunner } from './ffmpeg-runner';
 
 // enforcing sandbox on all renderer processes (for better security)
 app.enableSandbox();
@@ -10,6 +11,7 @@ app.enableSandbox();
 // If you want to use a custom path for application data storage, you can set the path this way:
 // app.setPath ('userData', 'path/to/app/data'));
 AppStore.init();
+FFmpegRunner.init();
 
 function createWindow() {
   // Create the browser window.
