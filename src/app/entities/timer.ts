@@ -1,4 +1,4 @@
-import { BehaviorSubject, distinctUntilChanged, filter } from 'rxjs';
+import { BehaviorSubject, distinctUntilChanged, filter, share } from 'rxjs';
 
 export interface Time {
   minutes: number;
@@ -30,6 +30,7 @@ export class Timer {
 
   get currentTime() {
     return this.$time.pipe(
+      share(),
       filter((time) => time.minutes >= 0 && time.seconds >= 0),
       distinctUntilChanged(
         (a, b) =>
@@ -41,7 +42,7 @@ export class Timer {
   }
 
   get state() {
-    return this.$state.asObservable();
+    return this.$state.pipe(share());
   }
 
   start(): void {
