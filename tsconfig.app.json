@@ -4,6 +4,8 @@
   "compilerOptions": {
     "outDir": "./out-tsc/app",
     "types": ["@types/offscreencanvas"],
+    "allowSyntheticDefaultImports": true,
+    "experimentalDecorators": true
   },
   "files": [
     "src/main.ts"
