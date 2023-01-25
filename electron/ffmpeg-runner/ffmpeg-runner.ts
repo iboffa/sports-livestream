@@ -1,9 +1,6 @@
 import { ChildProcess, spawn } from 'child_process';
 import { ipcMain } from 'electron';
-
-export const START = 'ffmpeg:start';
-export const VIDEO_CHUNK = 'ffmpeg:video-chunk';
-export const STOP = 'ffmpeg:stop';
+import { START, VIDEO_CHUNK, STOP } from './messages';
 
 export interface FFmpegOptions {
   youtubeStream: boolean;

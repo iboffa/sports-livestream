@@ -2,7 +2,7 @@ import {join as pathJoin} from 'path';
 
 import { app, BrowserWindow } from 'electron';
 import { AppStore } from './app-store';
-import { FFmpegRunner } from './ffmpeg-runner';
+import { FFmpegRunner } from './ffmpeg-runner/ffmpeg-runner';
 
 // enforcing sandbox on all renderer processes (for better security)
 app.enableSandbox();

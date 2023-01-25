@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { START, STOP, VIDEO_CHUNK } from './ffmpeg-runner';
+import { START, STOP, VIDEO_CHUNK } from './ffmpeg-runner/messages';
 
 contextBridge.exposeInMainWorld('appStore', {
     get: (prop: string) => ipcRenderer.sendSync('store:get', prop),
