@@ -42,7 +42,7 @@ export class Timer {
   }
 
   get state() {
-    return this.$state.pipe(share());
+    return this.$state.asObservable();
   }
 
   start(): void {
