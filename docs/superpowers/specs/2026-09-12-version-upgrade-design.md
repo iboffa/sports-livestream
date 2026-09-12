@@ -24,7 +24,7 @@ Exact final version numbers are resolved at implementation time (`npm view <pkg>
 
 - Upgrade Angular framework + CLI to the latest major, one major version at a time.
 - Upgrade Electron and `electron-builder` to latest.
-- Migrate the `electron/` main-process build (`esbuild-electron` script) from CommonJS to ESM output, and update `package.json` accordingly, so `electron-store` can move to its latest (ESM-only) major.
+- Migrate the `electron/` main-process build (`esbuild-electron` script) from CommonJS to ESM output — via `.mjs` output extensions on the bundled `main`/`preload` files rather than a project-wide `"type": "module"` in `package.json` (which would also change how Jest and the rest of the Node-based tooling in this package interpret every plain `.js` file, an unnecessary and riskier blast radius for a change that only needs to affect two bundled entry files) — so `electron-store` can move to its latest (ESM-only) major.
 - Upgrade `electron-store` to latest, updating `electron/app-store.ts` from `require('electron-store')` to a normal `import`.
 - Upgrade `pixi.js` to v8 and fix the resulting compile/runtime breakage in `src/app/entities/async-text-sprite.ts`, `src/app/entities/boxed-text.ts`, `src/app/entities/docked.ts`, and the Pixi setup in `src/app/app.component.ts` — visual output and behavior must remain identical.
 - Bump whatever supporting/dev dependencies (`rxjs`, `zone.js`, `typescript`, `jest`, `jest-preset-angular`, `esbuild`) the above require to keep building and testing green.
@@ -43,7 +43,7 @@ Exact final version numbers are resolved at implementation time (`npm view <pkg>
 ## Sequencing & approach
 
 1. **Angular first.** Its CLI schematics are independent of Electron. Run `ng update @angular/core @angular/cli` one major at a time, from the current major up through each intermediate major to whatever the latest stable major is at implementation time, building and running `npm test` after each step before moving to the next. This makes any breakage traceable to a single major version rather than jumping several majors at once.
-2. **Electron + module system second.** Bump `electron` and `electron-builder` to latest in one step (Electron's core APIs used here — `app`, `BrowserWindow`, `ipcMain`, `contextBridge`, `ipcRenderer` — are stable across majors, and Electron has no per-major migration tooling the way Angular does). Then migrate `electron/`'s build to ESM (`esbuild-electron` gets `--format=esm`, `package.json` gets `"type": "module"`), and upgrade `electron-store` to latest, converting `app-store.ts`'s `require('electron-store')` to `import Store from 'electron-store'`.
+2. **Electron + module system second.** Bump `electron` and `electron-builder` to latest in one step (Electron's core APIs used here — `app`, `BrowserWindow`, `ipcMain`, `contextBridge`, `ipcRenderer` — are stable across majors, and Electron has no per-major migration tooling the way Angular does). Then migrate `electron/`'s build to ESM (`esbuild-electron` gets `--format=esm --out-extension:.js=.mjs`, so the bundled main/preload files carry `.mjs` and are ESM regardless of `package.json`'s module type), and upgrade `electron-store` to latest, converting `app-store.ts`'s `require('electron-store')` to `import Store from 'electron-store'`.
 3. **pixi.js last.** Independent of the other two; only touches the entities layer and `app.component.ts`.
 
 ## Detailed notes per component
