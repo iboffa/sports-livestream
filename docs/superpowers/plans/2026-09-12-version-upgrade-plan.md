@@ -780,11 +780,11 @@ git commit -m "chore: migrate electron main process to ESM (.mjs), upgrade elect
 ### Task 10: pixi.js 7 → 8
 
 **Files:**
-- Modify: `package.json`, `package-lock.json`, `src/app/entities/async-text-sprite.ts`, `src/app/entities/boxed-text.ts`, `src/app/entities/docked.ts`, `src/app/app.component.ts`
+- Modify: `package.json`, `package-lock.json`, `src/app/entities/async-text-sprite.ts`, `src/app/entities/boxed-text.ts`, `src/app/entities/docked.ts`, `src/app/app.component.ts`, `src/app/app.component.spec.ts`
 
 **Interfaces:**
-- Consumes: repo at pixi.js ^7.1.1, all prior tasks complete — build/test green, app launches.
-- Produces: pixi.js 8.20.1, all four files updated to compile and render identically under v8 — build/test green, app launches with the same visual overlay (box, timer, name text, grid layout), committed.
+- Consumes: repo at pixi.js ^7.1.1, all prior tasks complete — build/test green, app launches. `src/app/app.component.spec.ts` carries the `jest.mock('pixi.js', ...)` added in Task 0, shaped for `Application` as a bare mocked object and a separately-mocked `Renderer`.
+- Produces: pixi.js 8.20.1, all five files updated to compile and render identically under v8 — build/test green, app launches with the same visual overlay (box, timer, name text, grid layout), committed. The spec's mock is updated to match the new `Application.init()`/`.canvas` usage (Step 7).
 
 - [ ] **Step 1: Confirm clean starting state**
 
@@ -897,7 +897,7 @@ export class BoxedText extends Sprite {
       this._options.colspan = 1;
     }
     this._text =
-      this._options.text instanceof Observable<string | number>
+      this._options.text instanceof Observable
         ? new AsyncText(this._options.text)
         : new Text();
     this._box = new Graphics();
@@ -926,7 +926,7 @@ export class BoxedText extends Sprite {
   private draw() {
     this._box.clear();
     const padding = this._options.padding ?? 0;
-    if (!(this._options.text instanceof Observable<string | number>))
+    if (!(this._options.text instanceof Observable))
       this._text.text = this._options.text;
     if (this._options.textStyle)
       this._text.style = new TextStyle(this._options.textStyle);
@@ -1049,7 +1049,7 @@ export class BoxedText extends Sprite {
   }
 }
 ```
-Two behavior-preserving fixes bundled in here (both required just to compile/run correctly under v8, not stylistic changes): `instanceof Observable<string | number>` is not valid TypeScript (generic type arguments aren't allowed on the right-hand side of `instanceof`) — this already had to be `instanceof Observable` even pre-upgrade; and `super.destroy(options)` was missing from the original `destroy()` override (a pre-existing bug — the base `Sprite`/`Container` cleanup never ran). Call this out explicitly in the task report since it's a behavior change (albeit a bug fix, not a feature change) beyond pure version compatibility.
+One behavior-preserving fix bundled in here (required just to compile/run correctly under v8, not a stylistic change): `super.destroy(options)` was missing from the original `destroy()` override (a pre-existing bug — the base `Sprite`/`Container` cleanup never ran). Call this out explicitly in the task report since it's a behavior change (albeit a bug fix, not a feature change) beyond pure version compatibility. (Note: the `instanceof Observable<string | number>` → `instanceof Observable` fix shown above was already made in Task 1, Step 5, as an unavoidable fix for a TypeScript 5.1 compile error introduced by the Angular 16 upgrade — by this task, the file should already read `instanceof Observable` with no generic argument at both call sites. If it doesn't for some reason, apply the same fix here.)
 
 - [ ] **Step 5: Fix `src/app/entities/docked.ts`**
 
@@ -1165,26 +1165,44 @@ import { Application, Container, Text } from 'pixi.js';
 ```
 (`Application`'s `.canvas` property replaces the old `Renderer.view`; `.renderer.render(stage)` replaces the standalone `Renderer` instance's `.render(stage)` — the manual `requestAnimationFrame` loop calling it explicitly is unchanged, matching the Global Constraints note not to restructure this component's Pixi setup beyond what compiling under v8 requires.) The `TextStyle` import is no longer needed directly in this file — remove it from the `pixi.js` import line as shown above (it's still used inside `boxed-text.ts`, which keeps its own import).
 
-- [ ] **Step 7: Build**
+- [ ] **Step 7: Update the pixi.js mock in `src/app/app.component.spec.ts`**
+
+Task 0 added a `jest.mock('pixi.js', ...)` to this spec file shaped for the pre-v8 API (`Application` mocked as a bare `{}`, `Renderer` mocked with `.view`/`.render`). Step 6 above changed `app.component.ts` to construct `Application` with no constructor args and then `await`-call `.init(...)`, and to read `.canvas` instead of using a separate `Renderer`. The existing mock does not support this — `this.pixiApp.init(...)` would throw `TypeError: this.pixiApp.init is not a function`. Update the mock:
+```typescript
+jest.mock('pixi.js', () => {
+  const actual = jest.requireActual('pixi.js');
+  return {
+    ...actual,
+    Application: jest.fn().mockImplementation(() => ({
+      init: jest.fn().mockResolvedValue(undefined),
+      canvas: document.createElement('canvas'),
+      renderer: { render: jest.fn() },
+    })),
+  };
+});
+```
+The `Renderer` mock entry is no longer needed (production code no longer imports `Renderer` after Step 6) — remove it from the returned object. Leave the rest of `app.component.spec.ts` (both `it(...)` blocks) unchanged.
+
+- [ ] **Step 8: Build**
 
 ```
 npm run build
 ```
 Expected: succeeds with no TypeScript errors referencing removed/renamed pixi.js types.
 
-- [ ] **Step 8: Test**
+- [ ] **Step 9: Test**
 
 ```
 npm test
 ```
-Expected: same pass count as baseline (none of the existing spec files test the Pixi entities directly, per the file listing in `src/app/entities/` having no `.spec.ts` files — if `npm test` still passes trivially, that's expected, not a sign the migration wasn't exercised; the real verification is the visual smoke test in Step 9).
+Expected: same pass count as baseline (none of the existing spec files test the Pixi entities directly, per the file listing in `src/app/entities/` having no `.spec.ts` files — if `npm test` still passes trivially, that's expected, not a sign the migration wasn't exercised; the real verification is the visual smoke test in Step 10). If `app.component.spec.ts`'s "should create the app" test fails, confirm the Step 7 mock update was applied correctly.
 
-- [ ] **Step 9: Launch and visually confirm the overlay renders correctly**
+- [ ] **Step 10: Launch and visually confirm the overlay renders correctly**
 
 ```
 npm run electron:local
 ```
-Use the same screenshot procedure as Task 8 Step 5 (or ask a human to confirm) to verify:
+Confirm:
 - a black box with white "Example" text renders (the `testName` `BoxedText` bound to the text input's initial value),
 - a black box with a countdown timer text (`188:88`-width box, initially showing time counting down from 1:05) renders next to it,
 - a third black box with static "Test" text renders,
@@ -1204,9 +1222,9 @@ $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bound
 $bmp.Save("$env:TEMP\task10-pixi-smoke.png")
 Get-Process electron -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
-Read the saved PNG and check it against the three bullets above. If no display session is available, note this in the task report as `DONE_WITH_CONCERNS` and flag that a human should confirm visually before this task is considered fully verified — unlike the earlier tasks, this one has no automated test coverage for the thing that actually changed (see Step 8), so the visual check is the only regression test that exists for this task. If any box fails to render, white text disappears into no box background (a sign the `Graphics` `.rect().fill()` conversion in Step 4 is wrong), or text isn't centered, fix `boxed-text.ts` before proceeding.
+Read the saved PNG and check it against the three bullets above. If no display session is available, note this in the task report as `DONE_WITH_CONCERNS` and flag that a human should confirm visually before this task is considered fully verified — unlike the earlier tasks, this one has no automated test coverage for the thing that actually changed (see Step 9), so the visual check is the only regression test that exists for this task. If any box fails to render, white text disappears into no box background (a sign the `Graphics` `.rect().fill()` conversion in Step 4 is wrong), or text isn't centered, fix `boxed-text.ts` before proceeding.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```
 git add -A
