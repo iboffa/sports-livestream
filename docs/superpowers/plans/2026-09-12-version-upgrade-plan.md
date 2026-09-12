@@ -17,6 +17,8 @@
 - Always pass `--allow-dirty` to `ng update` invocations — the working tree carries an untracked `CLAUDE.md` file from repo setup that does not need to be committed as part of this work.
 - Do not force-install `typescript@latest` (currently `7.0.2`, a new major that Angular's compiler-cli is not verified against at time of writing). Let `ng update`'s own dependency resolution choose TypeScript at each step. Only touch the `typescript` version by hand if `npm run build` reports an explicit "TypeScript version mismatch" style error naming a required range — then install the highest version satisfying that range.
 - If `npm install`/`npm test` reports a missing or incompatible peer dependency not called out explicitly in a task below, install the latest version of exactly the package named in the error, note it in the task report, and continue — do not guess ahead at dependencies not yet demanded.
+- `ng update` may refuse to run at all with an "Incompatible peer dependencies found" error when the currently-installed `jest-preset-angular` doesn't yet support the target Angular major (this is expected at several of the Angular-major tasks below, given jest-preset-angular is only bumped partway through the sequence, not at every step). When this happens, re-run with `--force` added (Angular CLI's own flag, meaning "ignore peer dependency version mismatches" — not the same as `npm install --force`) — this is safe specifically because the task's own next step immediately resolves the named conflict by bumping jest-preset-angular. Note the `--force` use in the task report; it does not need to be treated as an escalation-worthy deviation.
+- `tsconfig.json` gained `"skipLibCheck": true` in Task 1 (to resolve `.d.ts`-vs-`.d.ts` conflicts between pixi.js v7's type declarations and TypeScript 5.1's updated DOM lib types — TypeScript's own documented mechanism for this class of conflict, compile-time only, no runtime/behavior effect). This should stay in place through the remaining Angular-major tasks. Once Task 10 upgrades pixi.js to v8 (which should ship `.d.ts` files compatible with modern TypeScript), Task 10's implementer should try removing `skipLibCheck: true` and re-running `npm run build` — if it still succeeds without it, remove it; if removing it surfaces unrelated `.d.ts` conflicts from other dependencies, leave it in place and note which conflicts remain.
 - Do not modify anything under `matchvisio/` — this plan is scoped to `sports-livestream` only.
 - Do not restructure `src/app/app.component.ts`'s Pixi setup beyond what's needed to compile/run under the new pixi.js major (Task 10) — the existing unused `Application` alongside the manually-driven `Renderer`/`Container` is a known pre-existing oddity, intentionally left alone here.
 - Every task ends with a commit. Never use `git commit --amend`.
@@ -1183,12 +1185,14 @@ jest.mock('pixi.js', () => {
 ```
 The `Renderer` mock entry is no longer needed (production code no longer imports `Renderer` after Step 6) — remove it from the returned object. Leave the rest of `app.component.spec.ts` (both `it(...)` blocks) unchanged.
 
-- [ ] **Step 8: Build**
+- [ ] **Step 8: Build, and check whether `skipLibCheck` is still needed**
 
 ```
 npm run build
 ```
 Expected: succeeds with no TypeScript errors referencing removed/renamed pixi.js types.
+
+Task 1 added `"skipLibCheck": true` to `tsconfig.json` specifically to resolve `.d.ts`-vs-`.d.ts` conflicts between pixi.js v7's type declarations and TypeScript's DOM lib types. Now that pixi.js is v8, check whether it's still needed: temporarily remove `"skipLibCheck": true` from `tsconfig.json` and re-run `npm run build`. If it still succeeds, leave `skipLibCheck` removed (this restores full type-checking of third-party `.d.ts` files for the rest of the codebase going forward) and note this in the task report. If removing it reintroduces compile errors, restore `"skipLibCheck": true` and note in the report exactly which errors reappeared (so it's clear this is still load-bearing, not just inertia).
 
 - [ ] **Step 9: Test**
 
