@@ -41,7 +41,7 @@ export class BoxedText extends Sprite {
       this._options.colspan = 1;
     }
     this._text =
-      this._options.text instanceof Observable<string | number>
+      this._options.text instanceof Observable
         ? new AsyncText(this._options.text)
         : new Text();
     this._box = new Graphics();
@@ -70,7 +70,7 @@ export class BoxedText extends Sprite {
   private draw() {
     this._box.clear();
     const padding = this._options.padding ?? 0;
-    if (!(this._options.text instanceof Observable<string | number>))
+    if (!(this._options.text instanceof Observable))
       this._text.text = this._options.text;
     if (this._options.textStyle)
       this._text.style = new TextStyle(this._options.textStyle);
