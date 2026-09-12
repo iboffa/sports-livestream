@@ -24,6 +24,164 @@
 
 ---
 
+### Task 0: Fix pre-existing baseline test failures
+
+Before any version work starts, `npm test` on this repo already fails 2 of 5 suites (3 of 14 tests), for reasons unrelated to any dependency version:
+1. `src/app/services/audio/audio.service.spec.ts` crashes with `ReferenceError: AudioContext is not defined` — `AudioService`'s constructor eagerly does `new AudioContext()`, and jsdom (Jest's DOM emulation) doesn't implement the Web Audio API.
+2. `src/app/app.component.spec.ts` (both tests) crash with `Unable to auto-detect a suitable renderer` — `app.component.ts`'s `pixiApp: Application = new Application({...})` field initializer runs pixi.js's WebGL/Canvas renderer detection eagerly, and jsdom has neither. Separately, the second test asserts `.content span` contains `"angular-template app is running!"` — stale boilerplate from the original `ng new` scaffold that doesn't match this app's real template at all.
+
+This task fixes both, in test files only — no production code changes — so every later task in this plan has a real, fully-green baseline to regress against.
+
+**Files:**
+- Modify: `src/app/services/audio/audio.service.spec.ts`
+- Modify: `src/app/app.component.spec.ts`
+
+**Interfaces:**
+- Consumes: repo as of the current HEAD — `npm test` reports 2 failed suites, 3 failed tests, 11 passed, 14 total.
+- Produces: `npm test` reports 5 passed suites, 14 passed tests, 0 failed — committed. No production source file changes.
+
+- [ ] **Step 1: Confirm the known failures**
+
+```
+npm test
+```
+Expected: `Test Suites: 2 failed, 3 passed, 5 total` / `Tests: 3 failed, 11 passed, 14 total` — matching the failures described above. If the numbers differ from this, stop and report `NEEDS_CONTEXT` rather than guessing at a fix for a different failure set.
+
+- [ ] **Step 2: Fix `audio.service.spec.ts`**
+
+Replace the full file with:
+```typescript
+import { TestBed } from '@angular/core/testing';
+
+import { AudioService } from './audio.service';
+
+describe('AudioService', () => {
+  let service: AudioService;
+
+  beforeAll(() => {
+    (global as any).AudioContext = jest.fn().mockImplementation(() => ({
+      currentTime: 0,
+      createMediaStreamDestination: jest.fn(() => ({
+        stream: { getAudioTracks: () => [] },
+        disconnect: jest.fn(),
+      })),
+      createGain: jest.fn(() => ({
+        gain: { setValueAtTime: jest.fn() },
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+      })),
+      createBiquadFilter: jest.fn(() => ({
+        type: '',
+        frequency: { value: 0 },
+        connect: jest.fn(),
+      })),
+      createDynamicsCompressor: jest.fn(() => ({
+        threshold: { value: 0 },
+        knee: { value: 0 },
+        ratio: { value: 0 },
+        attack: { value: 0 },
+        release: { value: 0 },
+        connect: jest.fn(),
+      })),
+      createMediaStreamSource: jest.fn(() => ({
+        connect: jest.fn(),
+      })),
+    }));
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        enumerateDevices: jest.fn().mockResolvedValue([]),
+        getUserMedia: jest.fn().mockResolvedValue({} as MediaStream),
+      },
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(AudioService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+});
+```
+This mirrors the existing per-file mocking pattern already used in `src/app/services/record/record.service.spec.ts` (which stubs `window.MediaStream`/`window.MediaRecorder` in its own `beforeAll`), rather than introducing a new global stub in `setup-jest.ts` — kept consistent with how this codebase already handles jsdom API gaps.
+
+- [ ] **Step 3: Run just this suite to confirm the fix**
+
+```
+npx jest src/app/services/audio/audio.service.spec.ts
+```
+Expected: `Tests: 1 passed, 1 total`.
+
+- [ ] **Step 4: Fix `app.component.spec.ts`**
+
+Replace the full file with:
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
+import { AppComponent } from './app.component';
+
+jest.mock('pixi.js', () => {
+  const actual = jest.requireActual('pixi.js');
+  return {
+    ...actual,
+    Application: jest.fn().mockImplementation(() => ({})),
+    Renderer: jest.fn().mockImplementation(() => ({
+      view: document.createElement('canvas'),
+      render: jest.fn(),
+    })),
+  };
+});
+
+describe('AppComponent', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [RouterTestingModule, AppComponent],
+    }).compileComponents();
+  });
+
+  it('should create the app', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const app = fixture.componentInstance;
+    expect(app).toBeTruthy();
+  });
+
+  it('should render the container and controls', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('input[type="text"]')).toBeTruthy();
+  });
+});
+```
+Only `Application` and `Renderer` are replaced with mocks (the two constructors that internally try to detect a WebGL/Canvas context, which jsdom doesn't have) — every other pixi.js export (`Graphics`, `Sprite`, `Ticker`, `Container`, `Text`, `TextStyle`, etc., used internally by `BoxedText`/`createGridLayout`/`Timer`) stays the real implementation via `jest.requireActual`, since those don't need a renderer to construct and aren't what's crashing. The second test's assertion changed from the stale scaffold text to checking for the text input that's actually in `app.component.html`.
+
+- [ ] **Step 5: Run just this suite to confirm the fix**
+
+```
+npx jest src/app/app.component.spec.ts
+```
+Expected: `Tests: 2 passed, 2 total`. If `requestAnimationFrame is not defined` appears (from `app.component.ts`'s own `animate()` loop running during `ngAfterViewInit`), add `global.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(cb, 0) as unknown as number;` and `global.cancelAnimationFrame = (id: number) => clearTimeout(id);` to the top of the `beforeEach` block (this jsdom version likely already implements these natively — only add the polyfill if the test actually reports it missing).
+
+- [ ] **Step 6: Full test run**
+
+```
+npm test
+```
+Expected: `Test Suites: 5 passed, 5 total` / `Tests: 14 passed, 14 total`, 0 failed.
+
+- [ ] **Step 7: Commit**
+
+```
+git add -A
+git commit -m "test: fix pre-existing baseline failures in audio and app.component specs"
+```
+
+---
+
 ### Task 1: Angular 15 → 16
 
 **Files:**
