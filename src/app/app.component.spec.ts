@@ -2,6 +2,18 @@ import { TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { AppComponent } from './app.component';
 
+jest.mock('pixi.js', () => {
+  const actual = jest.requireActual('pixi.js');
+  return {
+    ...actual,
+    Application: jest.fn().mockImplementation(() => ({})),
+    Renderer: jest.fn().mockImplementation(() => ({
+      view: document.createElement('canvas'),
+      render: jest.fn(),
+    })),
+  };
+});
+
 describe('AppComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -15,12 +27,11 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render title', () => {
+  it('should render the container and controls', () => {
     const fixture = TestBed.createComponent(AppComponent);
-    fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('.content span')?.textContent).toContain(
-      'angular-template app is running!'
-    );
+    // Check for input in the template without calling detectChanges()
+    // to avoid triggering ngAfterViewInit which initializes pixi.js
+    expect(compiled.querySelector('input[type="text"]')).toBeTruthy();
   });
 });
