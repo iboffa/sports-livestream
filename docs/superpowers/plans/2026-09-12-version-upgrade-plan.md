@@ -462,11 +462,11 @@ git commit -m "chore: upgrade Angular to 20"
 ### Task 6: Angular 20 → 21
 
 **Files:**
-- Modify: `package.json`, `package-lock.json`, and any build-tooling/config files the schematic touches
+- Modify: `package.json`, `package-lock.json`, `setup-jest.ts`, and any build-tooling/config files the schematic touches
 
 **Interfaces:**
-- Consumes: repo at Angular 20.3.31, jest-preset-angular 14.6.2, jest 29.7.0 — build/test green (from Task 5).
-- Produces: repo at Angular 21.2.23 / CLI 21.2.24, jest-preset-angular 16.2.0, jest 30.5.1, new devDependency `jest-environment-jsdom` 30.5.1 — build/test green, committed.
+- Consumes: repo at Angular 20.3.31, jest-preset-angular 14.6.2, jest 29.7.0 — build/test green (from Task 5). `setup-jest.ts` does `import 'jest-preset-angular/setup-jest';` and `package.json`'s jest config has `"globalSetup": "jest-preset-angular/global-setup"` — both modules are removed as of jest-preset-angular 16.
+- Produces: repo at Angular 21.2.23 / CLI 21.2.24, jest-preset-angular 16.2.0, jest 30.5.1, new devDependency `jest-environment-jsdom` 30.5.1, `setup-jest.ts` calling `setupZoneTestEnv()` instead, `globalSetup` removed from the jest config — build/test green, committed.
 
 - [ ] **Step 1: Confirm clean starting state**
 
@@ -494,19 +494,32 @@ jest-preset-angular 14.6.2 does not support Angular 21 (its range tops out at <2
 npm install --save-dev jest-preset-angular@16.2.0 jest@30.5.1 jest-environment-jsdom@30.5.1
 ```
 
-- [ ] **Step 5: Set the Jest test environment explicitly**
+- [ ] **Step 5: Update the Jest config for jest-preset-angular 16's removed APIs**
 
-Read `package.json`'s `"jest"` block. If it does not already specify `"testEnvironment"`, add it so Jest 30 knows to use jsdom:
+jest-preset-angular 16.2.0 has fully removed two things the current config relies on (confirmed by inspecting the published package contents — this is not a deprecation warning, it's a hard removal that will otherwise fail every test run):
+- `jest-preset-angular/global-setup` no longer exists as a module. The preset's own `createCjsPreset()` no longer needs a separate global setup step, so this line is simply obsolete, not replaced by something else.
+- `jest-preset-angular/setup-jest` (the module `setup-jest.ts` imports) no longer exists either. It's replaced by an explicit `setupZoneTestEnv()` function from `jest-preset-angular/setup-env/zone`.
 
+Update `package.json`'s `"jest"` block — remove the `globalSetup` line and add an explicit `testEnvironment` (Jest 30 no longer bundles a default DOM environment package, though the preset still defaults the *name* to `'jsdom'`; being explicit here is just defensive):
 ```json
 "jest": {
   "preset": "jest-preset-angular",
   "testEnvironment": "jsdom",
   "setupFilesAfterEnv": [
     "<rootDir>/setup-jest.ts"
-  ],
-  "globalSetup": "jest-preset-angular/global-setup"
+  ]
 }
+```
+
+Update `setup-jest.ts` from:
+```typescript
+import 'jest-preset-angular/setup-jest';
+```
+to:
+```typescript
+import { setupZoneTestEnv } from 'jest-preset-angular/setup-env/zone';
+
+setupZoneTestEnv();
 ```
 
 - [ ] **Step 6: Build**
@@ -520,13 +533,16 @@ npm run build
 ```
 npm test
 ```
-Expected: same pass count as baseline. If a test fails with a DOM-API-related error it didn't before, check whether jsdom 30's stricter DOM implementation is the cause (read the failing test's assertion) and fix the test/source accordingly — do not disable the failing test.
+Expected: same pass count as baseline, with the `setup-jest.js` deprecation `console.warn` (present since Task 3) now gone, since `setup-jest.ts` no longer imports the removed module. If a test fails with a DOM-API-related error it didn't before, check whether jsdom 30's stricter DOM implementation is the cause (read the failing test's assertion) and fix the test/source accordingly — do not disable the failing test. If Jest fails immediately with a "Cannot find module" error for `jest-preset-angular/global-setup` or `jest-preset-angular/setup-jest`, confirm Step 5's edits were actually applied and saved.
 
 - [ ] **Step 8: Commit**
 
 ```
 git add -A
-git commit -m "chore: upgrade Angular to 21, jest to 30, jest-preset-angular to 16.2.0"
+git commit -m "chore: upgrade Angular to 21, jest to 30, jest-preset-angular to 16.2.0
+
+Also migrates setup-jest.ts and the jest config off jest-preset-angular's
+removed global-setup/setup-jest modules to the new setupZoneTestEnv() API."
 ```
 
 ---
