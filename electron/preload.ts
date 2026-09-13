@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld('appStore', {
 });
 
 contextBridge.exposeInMainWorld('recordApi', {
-  start: (options?: any)=> ipcRenderer.send(START, options),
-  sendChunk: (chunk: ArrayBuffer)=>ipcRenderer.send(VIDEO_CHUNK, chunk),
+  // invoke, not send: the renderer needs to know whether ffmpeg actually started
+  start: () => ipcRenderer.invoke(START),
+  sendChunk: (chunk: ArrayBuffer) => ipcRenderer.send(VIDEO_CHUNK, chunk),
   stop: () => ipcRenderer.send(STOP)
 })

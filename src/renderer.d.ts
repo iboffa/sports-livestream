@@ -6,8 +6,14 @@ interface AppStore {
   delete: (prop: string) => void;
 }
 
+interface RecordStartResult {
+  ok: boolean;
+  error?: string;
+}
+
 interface RecordApi {
-  start: (options?: any) => void;
+  /** Resolves once ffmpeg has either started or failed to start. */
+  start: () => Promise<RecordStartResult>;
   sendChunk: (chunk: ArrayBuffer) => void;
   stop: () => void;
 }
