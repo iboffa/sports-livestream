@@ -1,8 +1,5 @@
 import { ipcMain } from 'electron';
-import { Options } from 'electron-store';
-
-// This cannot be converted to an import for how "Store" is defined within electron-store library. It would break esbuild compilation
-const Store = require('electron-store');
+import Store, { Options } from 'electron-store';
 
 export class AppStore {
 

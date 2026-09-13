@@ -5,33 +5,29 @@ import {
   ElementRef,
   NgZone,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
-import { Application, Renderer, Container, Text, TextStyle } from 'pixi.js';
+import { Application, Container, Text } from 'pixi.js';
 import { map, Observable, startWith, tap } from 'rxjs';
 import { BoxedText } from './entities/boxed-text';
 import { createGridLayout } from './entities/docked';
 import { Timer } from './entities/timer';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
-  standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    changeDetection: ChangeDetectionStrategy.Eager,
+    imports: [CommonModule, RouterModule, ReactiveFormsModule]
 })
 export class AppComponent implements AfterViewInit {
 
   textContent = new FormControl<string>('Example');
 
   @ViewChild('container') container!: ElementRef;
-  pixiApp: Application = new Application({
-    width: 640,
-    height: 480,
-    antialias: true
-  });
-  private renderer!: Renderer;
+  private pixiApp!: Application;
   private stage!: Container;
   private timer = new Timer(
     'down',
@@ -53,18 +49,20 @@ export class AppComponent implements AfterViewInit {
   status$ = this.timer.state;
   constructor(private ngZone: NgZone) {}
 
-  ngAfterViewInit() {
-    this.renderer = new Renderer({
+  async ngAfterViewInit() {
+    this.pixiApp = new Application();
+    await this.pixiApp.init({
       width: 640,
       height: 480,
       backgroundColor: 0xffffff,
+      antialias: true,
     });
     this.stage = new Container();
-    this.container.nativeElement.appendChild(this.renderer.view);
+    this.container.nativeElement.appendChild(this.pixiApp.canvas);
 
     const timeBox = new BoxedText({
       text: this.timer$,
-      minWidth: new Text('188:88', {fontSize:14}).width,
+      minWidth: new Text({ text: '188:88', style: { fontSize: 14 } }).width,
       background: 0x00000,
       padding: 5,
       textStyle: { fill: '#ffffff', fontSize:14 },
@@ -100,7 +98,7 @@ export class AppComponent implements AfterViewInit {
   }
 
   private animate() {
-    this.renderer.render(this.stage);
+    this.pixiApp.renderer.render(this.stage);
 
     // Request the next animation frame
     requestAnimationFrame(() => this.animate());

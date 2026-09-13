@@ -1,21 +1,20 @@
 
-import { ICanvas, IDestroyOptions, ITextStyle, Text, TextStyle } from 'pixi.js';
+import { DestroyOptions, Text, TextStyle, TextStyleOptions } from 'pixi.js';
 import { Observable, Subscription } from 'rxjs';
 
 export class AsyncText extends Text {
   asyncText: Observable<string | number>;
   textSub: Subscription;
   constructor(
-    text: Observable<string|number>,
-    style?: Partial<ITextStyle> | TextStyle,
-    canvas?: ICanvas
+    text: Observable<string | number>,
+    style?: Partial<TextStyleOptions> | TextStyle
   ) {
-    super('', style, canvas);
+    super({ text: '', style });
     this.asyncText = text;
-    this.textSub = text.subscribe((t) => (this.text = t));
+    this.textSub = text.subscribe((t) => (this.text = String(t)));
   }
 
-  override destroy(options?: boolean | IDestroyOptions | undefined): void {
+  override destroy(options?: DestroyOptions): void {
     this.textSub.unsubscribe();
     super.destroy(options);
   }

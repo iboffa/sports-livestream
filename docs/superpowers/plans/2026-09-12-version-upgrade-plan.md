@@ -17,10 +17,170 @@
 - Always pass `--allow-dirty` to `ng update` invocations — the working tree carries an untracked `CLAUDE.md` file from repo setup that does not need to be committed as part of this work.
 - Do not force-install `typescript@latest` (currently `7.0.2`, a new major that Angular's compiler-cli is not verified against at time of writing). Let `ng update`'s own dependency resolution choose TypeScript at each step. Only touch the `typescript` version by hand if `npm run build` reports an explicit "TypeScript version mismatch" style error naming a required range — then install the highest version satisfying that range.
 - If `npm install`/`npm test` reports a missing or incompatible peer dependency not called out explicitly in a task below, install the latest version of exactly the package named in the error, note it in the task report, and continue — do not guess ahead at dependencies not yet demanded.
+- `ng update` may refuse to run at all with an "Incompatible peer dependencies found" error when the currently-installed `jest-preset-angular` doesn't yet support the target Angular major (this is expected at several of the Angular-major tasks below, given jest-preset-angular is only bumped partway through the sequence, not at every step). When this happens, re-run with `--force` added (Angular CLI's own flag, meaning "ignore peer dependency version mismatches" — not the same as `npm install --force`) — this is safe specifically because the task's own next step immediately resolves the named conflict by bumping jest-preset-angular. Note the `--force` use in the task report; it does not need to be treated as an escalation-worthy deviation.
+- `tsconfig.json` gained `"skipLibCheck": true` in Task 1 (to resolve `.d.ts`-vs-`.d.ts` conflicts between pixi.js v7's type declarations and TypeScript 5.1's updated DOM lib types — TypeScript's own documented mechanism for this class of conflict, compile-time only, no runtime/behavior effect). This should stay in place through the remaining Angular-major tasks. Once Task 10 upgrades pixi.js to v8 (which should ship `.d.ts` files compatible with modern TypeScript), Task 10's implementer should try removing `skipLibCheck: true` and re-running `npm run build` — if it still succeeds without it, remove it; if removing it surfaces unrelated `.d.ts` conflicts from other dependencies, leave it in place and note which conflicts remain.
 - Do not modify anything under `matchvisio/` — this plan is scoped to `sports-livestream` only.
 - Do not restructure `src/app/app.component.ts`'s Pixi setup beyond what's needed to compile/run under the new pixi.js major (Task 10) — the existing unused `Application` alongside the manually-driven `Renderer`/`Container` is a known pre-existing oddity, intentionally left alone here.
 - Every task ends with a commit. Never use `git commit --amend`.
 - Target versions for this plan (verified against the npm registry on 2026-09-12): `@angular/*` families at 16.2.12 → 17.3.12 → 18.2.14 → 19.2.25 → 20.3.31 → 21.2.23 → 22.1.6, `@angular/cli` at the matching 16.2.16 → 17.3.17 → 18.2.21 → 19.2.27 → 20.3.37 → 21.2.24 → 22.1.8, `electron` 44.3.0, `electron-builder` 26.15.3, `electron-store` 11.0.2, `pixi.js` 8.20.1, `jest-preset-angular` 13.1.6 / 14.6.2 / 16.2.0 / 17.0.0 (staged across tasks below), `jest` 29.7.0 then 30.5.1, `jest-environment-jsdom` 30.5.1. If any of these no longer resolve via `npm view <pkg>@<version> version` at implementation time (deprecated/unpublished), use the latest version still satisfying the same major instead.
+
+---
+
+### Task 0: Fix pre-existing baseline test failures
+
+Before any version work starts, `npm test` on this repo already fails 2 of 5 suites (3 of 14 tests), for reasons unrelated to any dependency version:
+1. `src/app/services/audio/audio.service.spec.ts` crashes with `ReferenceError: AudioContext is not defined` — `AudioService`'s constructor eagerly does `new AudioContext()`, and jsdom (Jest's DOM emulation) doesn't implement the Web Audio API.
+2. `src/app/app.component.spec.ts` (both tests) crash with `Unable to auto-detect a suitable renderer` — `app.component.ts`'s `pixiApp: Application = new Application({...})` field initializer runs pixi.js's WebGL/Canvas renderer detection eagerly, and jsdom has neither. Separately, the second test asserts `.content span` contains `"angular-template app is running!"` — stale boilerplate from the original `ng new` scaffold that doesn't match this app's real template at all.
+
+This task fixes both, in test files only — no production code changes — so every later task in this plan has a real, fully-green baseline to regress against.
+
+**Files:**
+- Modify: `src/app/services/audio/audio.service.spec.ts`
+- Modify: `src/app/app.component.spec.ts`
+
+**Interfaces:**
+- Consumes: repo as of the current HEAD — `npm test` reports 2 failed suites, 3 failed tests, 11 passed, 14 total.
+- Produces: `npm test` reports 5 passed suites, 14 passed tests, 0 failed — committed. No production source file changes.
+
+- [ ] **Step 1: Confirm the known failures**
+
+```
+npm test
+```
+Expected: `Test Suites: 2 failed, 3 passed, 5 total` / `Tests: 3 failed, 11 passed, 14 total` — matching the failures described above. If the numbers differ from this, stop and report `NEEDS_CONTEXT` rather than guessing at a fix for a different failure set.
+
+- [ ] **Step 2: Fix `audio.service.spec.ts`**
+
+Replace the full file with:
+```typescript
+import { TestBed } from '@angular/core/testing';
+
+import { AudioService } from './audio.service';
+
+describe('AudioService', () => {
+  let service: AudioService;
+
+  beforeAll(() => {
+    (global as any).AudioContext = jest.fn().mockImplementation(() => ({
+      currentTime: 0,
+      createMediaStreamDestination: jest.fn(() => ({
+        stream: { getAudioTracks: () => [] },
+        disconnect: jest.fn(),
+      })),
+      createGain: jest.fn(() => ({
+        gain: { setValueAtTime: jest.fn() },
+        connect: jest.fn(),
+        disconnect: jest.fn(),
+      })),
+      createBiquadFilter: jest.fn(() => ({
+        type: '',
+        frequency: { value: 0 },
+        connect: jest.fn(),
+      })),
+      createDynamicsCompressor: jest.fn(() => ({
+        threshold: { value: 0 },
+        knee: { value: 0 },
+        ratio: { value: 0 },
+        attack: { value: 0 },
+        release: { value: 0 },
+        connect: jest.fn(),
+      })),
+      createMediaStreamSource: jest.fn(() => ({
+        connect: jest.fn(),
+      })),
+    }));
+
+    Object.defineProperty(navigator, 'mediaDevices', {
+      value: {
+        enumerateDevices: jest.fn().mockResolvedValue([]),
+        getUserMedia: jest.fn().mockResolvedValue({} as MediaStream),
+      },
+      configurable: true,
+    });
+  });
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(AudioService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+});
+```
+This mirrors the existing per-file mocking pattern already used in `src/app/services/record/record.service.spec.ts` (which stubs `window.MediaStream`/`window.MediaRecorder` in its own `beforeAll`), rather than introducing a new global stub in `setup-jest.ts` — kept consistent with how this codebase already handles jsdom API gaps.
+
+- [ ] **Step 3: Run just this suite to confirm the fix**
+
+```
+npx jest src/app/services/audio/audio.service.spec.ts
+```
+Expected: `Tests: 1 passed, 1 total`.
+
+- [ ] **Step 4: Fix `app.component.spec.ts`**
+
+Replace the full file with:
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
+import { AppComponent } from './app.component';
+
+jest.mock('pixi.js', () => {
+  const actual = jest.requireActual('pixi.js');
+  return {
+    ...actual,
+    Application: jest.fn().mockImplementation(() => ({})),
+    Renderer: jest.fn().mockImplementation(() => ({
+      view: document.createElement('canvas'),
+      render: jest.fn(),
+    })),
+  };
+});
+
+describe('AppComponent', () => {
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [RouterTestingModule, AppComponent],
+    }).compileComponents();
+  });
+
+  it('should create the app', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    const app = fixture.componentInstance;
+    expect(app).toBeTruthy();
+  });
+
+  it('should render the container and controls', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+    expect(compiled.querySelector('input[type="text"]')).toBeTruthy();
+  });
+});
+```
+Only `Application` and `Renderer` are replaced with mocks (the two constructors that internally try to detect a WebGL/Canvas context, which jsdom doesn't have) — every other pixi.js export (`Graphics`, `Sprite`, `Ticker`, `Container`, `Text`, `TextStyle`, etc., used internally by `BoxedText`/`createGridLayout`/`Timer`) stays the real implementation via `jest.requireActual`, since those don't need a renderer to construct and aren't what's crashing. The second test's assertion changed from the stale scaffold text to checking for the text input that's actually in `app.component.html`.
+
+- [ ] **Step 5: Run just this suite to confirm the fix**
+
+```
+npx jest src/app/app.component.spec.ts
+```
+Expected: `Tests: 2 passed, 2 total`. If `requestAnimationFrame is not defined` appears (from `app.component.ts`'s own `animate()` loop running during `ngAfterViewInit`), add `global.requestAnimationFrame = (cb: FrameRequestCallback) => setTimeout(cb, 0) as unknown as number;` and `global.cancelAnimationFrame = (id: number) => clearTimeout(id);` to the top of the `beforeEach` block (this jsdom version likely already implements these natively — only add the polyfill if the test actually reports it missing).
+
+- [ ] **Step 6: Full test run**
+
+```
+npm test
+```
+Expected: `Test Suites: 5 passed, 5 total` / `Tests: 14 passed, 14 total`, 0 failed.
+
+- [ ] **Step 7: Commit**
+
+```
+git add -A
+git commit -m "test: fix pre-existing baseline failures in audio and app.component specs"
+```
 
 ---
 
@@ -302,11 +462,11 @@ git commit -m "chore: upgrade Angular to 20"
 ### Task 6: Angular 20 → 21
 
 **Files:**
-- Modify: `package.json`, `package-lock.json`, and any build-tooling/config files the schematic touches
+- Modify: `package.json`, `package-lock.json`, `setup-jest.ts`, and any build-tooling/config files the schematic touches
 
 **Interfaces:**
-- Consumes: repo at Angular 20.3.31, jest-preset-angular 14.6.2, jest 29.7.0 — build/test green (from Task 5).
-- Produces: repo at Angular 21.2.23 / CLI 21.2.24, jest-preset-angular 16.2.0, jest 30.5.1, new devDependency `jest-environment-jsdom` 30.5.1 — build/test green, committed.
+- Consumes: repo at Angular 20.3.31, jest-preset-angular 14.6.2, jest 29.7.0 — build/test green (from Task 5). `setup-jest.ts` does `import 'jest-preset-angular/setup-jest';` and `package.json`'s jest config has `"globalSetup": "jest-preset-angular/global-setup"` — both modules are removed as of jest-preset-angular 16.
+- Produces: repo at Angular 21.2.23 / CLI 21.2.24, jest-preset-angular 16.2.0, jest 30.5.1, new devDependency `jest-environment-jsdom` 30.5.1, `setup-jest.ts` calling `setupZoneTestEnv()` instead, `globalSetup` removed from the jest config — build/test green, committed.
 
 - [ ] **Step 1: Confirm clean starting state**
 
@@ -334,19 +494,32 @@ jest-preset-angular 14.6.2 does not support Angular 21 (its range tops out at <2
 npm install --save-dev jest-preset-angular@16.2.0 jest@30.5.1 jest-environment-jsdom@30.5.1
 ```
 
-- [ ] **Step 5: Set the Jest test environment explicitly**
+- [ ] **Step 5: Update the Jest config for jest-preset-angular 16's removed APIs**
 
-Read `package.json`'s `"jest"` block. If it does not already specify `"testEnvironment"`, add it so Jest 30 knows to use jsdom:
+jest-preset-angular 16.2.0 has fully removed two things the current config relies on (confirmed by inspecting the published package contents — this is not a deprecation warning, it's a hard removal that will otherwise fail every test run):
+- `jest-preset-angular/global-setup` no longer exists as a module. The preset's own `createCjsPreset()` no longer needs a separate global setup step, so this line is simply obsolete, not replaced by something else.
+- `jest-preset-angular/setup-jest` (the module `setup-jest.ts` imports) no longer exists either. It's replaced by an explicit `setupZoneTestEnv()` function from `jest-preset-angular/setup-env/zone`.
 
+Update `package.json`'s `"jest"` block — remove the `globalSetup` line and add an explicit `testEnvironment` (Jest 30 no longer bundles a default DOM environment package, though the preset still defaults the *name* to `'jsdom'`; being explicit here is just defensive):
 ```json
 "jest": {
   "preset": "jest-preset-angular",
   "testEnvironment": "jsdom",
   "setupFilesAfterEnv": [
     "<rootDir>/setup-jest.ts"
-  ],
-  "globalSetup": "jest-preset-angular/global-setup"
+  ]
 }
+```
+
+Update `setup-jest.ts` from:
+```typescript
+import 'jest-preset-angular/setup-jest';
+```
+to:
+```typescript
+import { setupZoneTestEnv } from 'jest-preset-angular/setup-env/zone';
+
+setupZoneTestEnv();
 ```
 
 - [ ] **Step 6: Build**
@@ -360,13 +533,16 @@ npm run build
 ```
 npm test
 ```
-Expected: same pass count as baseline. If a test fails with a DOM-API-related error it didn't before, check whether jsdom 30's stricter DOM implementation is the cause (read the failing test's assertion) and fix the test/source accordingly — do not disable the failing test.
+Expected: same pass count as baseline, with the `setup-jest.js` deprecation `console.warn` (present since Task 3) now gone, since `setup-jest.ts` no longer imports the removed module. If a test fails with a DOM-API-related error it didn't before, check whether jsdom 30's stricter DOM implementation is the cause (read the failing test's assertion) and fix the test/source accordingly — do not disable the failing test. If Jest fails immediately with a "Cannot find module" error for `jest-preset-angular/global-setup` or `jest-preset-angular/setup-jest`, confirm Step 5's edits were actually applied and saved.
 
 - [ ] **Step 8: Commit**
 
 ```
 git add -A
-git commit -m "chore: upgrade Angular to 21, jest to 30, jest-preset-angular to 16.2.0"
+git commit -m "chore: upgrade Angular to 21, jest to 30, jest-preset-angular to 16.2.0
+
+Also migrates setup-jest.ts and the jest config off jest-preset-angular's
+removed global-setup/setup-jest modules to the new setupZoneTestEnv() API."
 ```
 
 ---
@@ -622,11 +798,11 @@ git commit -m "chore: migrate electron main process to ESM (.mjs), upgrade elect
 ### Task 10: pixi.js 7 → 8
 
 **Files:**
-- Modify: `package.json`, `package-lock.json`, `src/app/entities/async-text-sprite.ts`, `src/app/entities/boxed-text.ts`, `src/app/entities/docked.ts`, `src/app/app.component.ts`
+- Modify: `package.json`, `package-lock.json`, `src/app/entities/async-text-sprite.ts`, `src/app/entities/boxed-text.ts`, `src/app/entities/docked.ts`, `src/app/app.component.ts`, `src/app/app.component.spec.ts`
 
 **Interfaces:**
-- Consumes: repo at pixi.js ^7.1.1, all prior tasks complete — build/test green, app launches.
-- Produces: pixi.js 8.20.1, all four files updated to compile and render identically under v8 — build/test green, app launches with the same visual overlay (box, timer, name text, grid layout), committed.
+- Consumes: repo at pixi.js ^7.1.1, all prior tasks complete — build/test green, app launches. `src/app/app.component.spec.ts` carries the `jest.mock('pixi.js', ...)` added in Task 0, shaped for `Application` as a bare mocked object and a separately-mocked `Renderer`.
+- Produces: pixi.js 8.20.1, all five files updated to compile and render identically under v8 — build/test green, app launches with the same visual overlay (box, timer, name text, grid layout), committed. The spec's mock is updated to match the new `Application.init()`/`.canvas` usage (Step 7).
 
 - [ ] **Step 1: Confirm clean starting state**
 
@@ -739,7 +915,7 @@ export class BoxedText extends Sprite {
       this._options.colspan = 1;
     }
     this._text =
-      this._options.text instanceof Observable<string | number>
+      this._options.text instanceof Observable
         ? new AsyncText(this._options.text)
         : new Text();
     this._box = new Graphics();
@@ -768,7 +944,7 @@ export class BoxedText extends Sprite {
   private draw() {
     this._box.clear();
     const padding = this._options.padding ?? 0;
-    if (!(this._options.text instanceof Observable<string | number>))
+    if (!(this._options.text instanceof Observable))
       this._text.text = this._options.text;
     if (this._options.textStyle)
       this._text.style = new TextStyle(this._options.textStyle);
@@ -891,7 +1067,7 @@ export class BoxedText extends Sprite {
   }
 }
 ```
-Two behavior-preserving fixes bundled in here (both required just to compile/run correctly under v8, not stylistic changes): `instanceof Observable<string | number>` is not valid TypeScript (generic type arguments aren't allowed on the right-hand side of `instanceof`) — this already had to be `instanceof Observable` even pre-upgrade; and `super.destroy(options)` was missing from the original `destroy()` override (a pre-existing bug — the base `Sprite`/`Container` cleanup never ran). Call this out explicitly in the task report since it's a behavior change (albeit a bug fix, not a feature change) beyond pure version compatibility.
+One behavior-preserving fix bundled in here (required just to compile/run correctly under v8, not a stylistic change): `super.destroy(options)` was missing from the original `destroy()` override (a pre-existing bug — the base `Sprite`/`Container` cleanup never ran). Call this out explicitly in the task report since it's a behavior change (albeit a bug fix, not a feature change) beyond pure version compatibility. (Note: the `instanceof Observable<string | number>` → `instanceof Observable` fix shown above was already made in Task 1, Step 5, as an unavoidable fix for a TypeScript 5.1 compile error introduced by the Angular 16 upgrade — by this task, the file should already read `instanceof Observable` with no generic argument at both call sites. If it doesn't for some reason, apply the same fix here.)
 
 - [ ] **Step 5: Fix `src/app/entities/docked.ts`**
 
@@ -1007,26 +1183,46 @@ import { Application, Container, Text } from 'pixi.js';
 ```
 (`Application`'s `.canvas` property replaces the old `Renderer.view`; `.renderer.render(stage)` replaces the standalone `Renderer` instance's `.render(stage)` — the manual `requestAnimationFrame` loop calling it explicitly is unchanged, matching the Global Constraints note not to restructure this component's Pixi setup beyond what compiling under v8 requires.) The `TextStyle` import is no longer needed directly in this file — remove it from the `pixi.js` import line as shown above (it's still used inside `boxed-text.ts`, which keeps its own import).
 
-- [ ] **Step 7: Build**
+- [ ] **Step 7: Update the pixi.js mock in `src/app/app.component.spec.ts`**
+
+Task 0 added a `jest.mock('pixi.js', ...)` to this spec file shaped for the pre-v8 API (`Application` mocked as a bare `{}`, `Renderer` mocked with `.view`/`.render`). Step 6 above changed `app.component.ts` to construct `Application` with no constructor args and then `await`-call `.init(...)`, and to read `.canvas` instead of using a separate `Renderer`. The existing mock does not support this — `this.pixiApp.init(...)` would throw `TypeError: this.pixiApp.init is not a function`. Update the mock:
+```typescript
+jest.mock('pixi.js', () => {
+  const actual = jest.requireActual('pixi.js');
+  return {
+    ...actual,
+    Application: jest.fn().mockImplementation(() => ({
+      init: jest.fn().mockResolvedValue(undefined),
+      canvas: document.createElement('canvas'),
+      renderer: { render: jest.fn() },
+    })),
+  };
+});
+```
+The `Renderer` mock entry is no longer needed (production code no longer imports `Renderer` after Step 6) — remove it from the returned object. Leave the rest of `app.component.spec.ts` (both `it(...)` blocks) unchanged.
+
+- [ ] **Step 8: Build, and check whether `skipLibCheck` is still needed**
 
 ```
 npm run build
 ```
 Expected: succeeds with no TypeScript errors referencing removed/renamed pixi.js types.
 
-- [ ] **Step 8: Test**
+Task 1 added `"skipLibCheck": true` to `tsconfig.json` specifically to resolve `.d.ts`-vs-`.d.ts` conflicts between pixi.js v7's type declarations and TypeScript's DOM lib types. Now that pixi.js is v8, check whether it's still needed: temporarily remove `"skipLibCheck": true` from `tsconfig.json` and re-run `npm run build`. If it still succeeds, leave `skipLibCheck` removed (this restores full type-checking of third-party `.d.ts` files for the rest of the codebase going forward) and note this in the task report. If removing it reintroduces compile errors, restore `"skipLibCheck": true` and note in the report exactly which errors reappeared (so it's clear this is still load-bearing, not just inertia).
+
+- [ ] **Step 9: Test**
 
 ```
 npm test
 ```
-Expected: same pass count as baseline (none of the existing spec files test the Pixi entities directly, per the file listing in `src/app/entities/` having no `.spec.ts` files — if `npm test` still passes trivially, that's expected, not a sign the migration wasn't exercised; the real verification is the visual smoke test in Step 9).
+Expected: same pass count as baseline (none of the existing spec files test the Pixi entities directly, per the file listing in `src/app/entities/` having no `.spec.ts` files — if `npm test` still passes trivially, that's expected, not a sign the migration wasn't exercised; the real verification is the visual smoke test in Step 10). If `app.component.spec.ts`'s "should create the app" test fails, confirm the Step 7 mock update was applied correctly.
 
-- [ ] **Step 9: Launch and visually confirm the overlay renders correctly**
+- [ ] **Step 10: Launch and visually confirm the overlay renders correctly**
 
 ```
 npm run electron:local
 ```
-Use the same screenshot procedure as Task 8 Step 5 (or ask a human to confirm) to verify:
+Confirm:
 - a black box with white "Example" text renders (the `testName` `BoxedText` bound to the text input's initial value),
 - a black box with a countdown timer text (`188:88`-width box, initially showing time counting down from 1:05) renders next to it,
 - a third black box with static "Test" text renders,
@@ -1046,9 +1242,9 @@ $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bound
 $bmp.Save("$env:TEMP\task10-pixi-smoke.png")
 Get-Process electron -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
-Read the saved PNG and check it against the three bullets above. If no display session is available, note this in the task report as `DONE_WITH_CONCERNS` and flag that a human should confirm visually before this task is considered fully verified — unlike the earlier tasks, this one has no automated test coverage for the thing that actually changed (see Step 8), so the visual check is the only regression test that exists for this task. If any box fails to render, white text disappears into no box background (a sign the `Graphics` `.rect().fill()` conversion in Step 4 is wrong), or text isn't centered, fix `boxed-text.ts` before proceeding.
+Read the saved PNG and check it against the three bullets above. If no display session is available, note this in the task report as `DONE_WITH_CONCERNS` and flag that a human should confirm visually before this task is considered fully verified — unlike the earlier tasks, this one has no automated test coverage for the thing that actually changed (see Step 9), so the visual check is the only regression test that exists for this task. If any box fails to render, white text disappears into no box background (a sign the `Graphics` `.rect().fill()` conversion in Step 4 is wrong), or text isn't centered, fix `boxed-text.ts` before proceeding.
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```
 git add -A
