@@ -5,6 +5,7 @@ import {
   ElementRef,
   NgZone,
   ViewChild,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -18,6 +19,7 @@ import { Timer } from './entities/timer';
     selector: 'app-root',
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.scss'],
+    changeDetection: ChangeDetectionStrategy.Eager,
     imports: [CommonModule, RouterModule, ReactiveFormsModule]
 })
 export class AppComponent implements AfterViewInit {
