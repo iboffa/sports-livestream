@@ -6,10 +6,10 @@ jest.mock('pixi.js', () => {
   const actual = jest.requireActual('pixi.js');
   return {
     ...actual,
-    Application: jest.fn().mockImplementation(() => ({})),
-    Renderer: jest.fn().mockImplementation(() => ({
-      view: document.createElement('canvas'),
-      render: jest.fn(),
+    Application: jest.fn().mockImplementation(() => ({
+      init: jest.fn().mockResolvedValue(undefined),
+      canvas: document.createElement('canvas'),
+      renderer: { render: jest.fn() },
     })),
   };
 });
@@ -73,6 +73,13 @@ describe('AppComponent', () => {
       }),
       configurable: true,
     });
+
+    // jsdom has no `canvas` npm package installed, so the global
+    // CanvasRenderingContext2D constructor pixi.js v8 feature-detects
+    // against (for letter-spacing support) doesn't exist; stub it.
+    if (typeof (globalThis as any).CanvasRenderingContext2D === 'undefined') {
+      (globalThis as any).CanvasRenderingContext2D = class {};
+    }
 
     await TestBed.configureTestingModule({
       imports: [RouterTestingModule, AppComponent],

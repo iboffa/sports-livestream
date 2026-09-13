@@ -28,7 +28,7 @@
     "cross-env": "^7.0.3",
     "electron-store": "^11.0.2",
     "ffmpeg-installer": "^1.0.2",
-    "pixi.js": "^7.1.1",
+    "pixi.js": "^8.20.1",
     "rxjs": "~7.5.0",
     "tslib": "^2.3.0",
     "zone.js": "~0.15.1"
@@ -58,6 +58,9 @@
     "testEnvironment": "jsdom",
     "setupFilesAfterEnv": [
       "<rootDir>/setup-jest.ts"
-    ]
+    ],
+    "moduleNameMapper": {
+      "^earcut$": "<rootDir>/node_modules/earcut/dist/earcut.dev.js"
+    }
   }
 }

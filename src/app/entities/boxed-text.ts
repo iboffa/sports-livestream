@@ -1,10 +1,10 @@
 import {
+  DestroyOptions,
   Graphics,
-  IDestroyOptions,
-  ITextStyle,
   Sprite,
   Text,
   TextStyle,
+  TextStyleOptions,
   Ticker,
 } from 'pixi.js';
 import { Observable, Subscription } from 'rxjs';
@@ -15,7 +15,7 @@ export interface BoxedTextOptions {
   background: number;
   padding?: number;
   minWidth?: number;
-  textStyle?: Partial<ITextStyle>;
+  textStyle?: Partial<TextStyleOptions>;
   colspan?: number;
 }
 
@@ -43,18 +43,17 @@ export class BoxedText extends Sprite {
     this._text =
       this._options.text instanceof Observable
         ? new AsyncText(this._options.text)
-        : new Text();
+        : new Text({ style: this._options.textStyle });
     this._box = new Graphics();
 
-
-    Ticker.shared.add(()=> this.draw())
+    Ticker.shared.add(() => this.draw());
 
     this.addChild(this._box);
     this.addChild(this._text);
 
     if (this._text instanceof AsyncText) {
       this._textSub = this._text.asyncText.subscribe((text) => {
-        this.updateText(text)
+        this.updateText(text);
       });
     }
   }
@@ -63,7 +62,7 @@ export class BoxedText extends Sprite {
     this._options = { ...this._options, ...options };
   }
 
-  updateText(text: string|number) {
+  updateText(text: string | number) {
     this.update({ text });
   }
 
@@ -71,20 +70,18 @@ export class BoxedText extends Sprite {
     this._box.clear();
     const padding = this._options.padding ?? 0;
     if (!(this._options.text instanceof Observable))
-      this._text.text = this._options.text;
+      this._text.text = String(this._options.text);
     if (this._options.textStyle)
       this._text.style = new TextStyle(this._options.textStyle);
 
-    this._box.beginFill(this._options.background);
     const width = Math.max(this._options.minWidth ?? 0, this._text.width + 2 * padding);
-    console.log(width);
-    this._box.drawRect(0, 0, width, this._text.height + 2 * padding);
-    this._box.endFill();
+    this._box.rect(0, 0, width, this._text.height + 2 * padding).fill(this._options.background);
     this.centerText();
   }
 
-  override destroy(options?: boolean | IDestroyOptions | undefined): void {
+  override destroy(options?: DestroyOptions): void {
     this._textSub?.unsubscribe();
+    super.destroy(options);
   }
 
   private centerText() {
