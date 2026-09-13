@@ -2,9 +2,7 @@ import {
   AfterViewInit,
   Component,
   ElementRef,
-  NgZone,
   ChangeDetectionStrategy,
-  inject,
   viewChild,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -23,8 +21,6 @@ import { Timer } from './entities/timer';
     imports: [ReactiveFormsModule]
 })
 export class AppComponent implements AfterViewInit {
-  private ngZone = inject(NgZone);
-
   textContent = new FormControl<string>('Example');
 
   container = viewChild.required<ElementRef>('container');
@@ -86,8 +82,7 @@ export class AppComponent implements AfterViewInit {
     const block = createGridLayout([[timeBox, testName, testName2]]);
     this.stage.addChild(block);
 
-    this.ngZone.runOutsideAngular(() => this.animate());
-
+    this.animate();
   }
 
   startTimer() {
