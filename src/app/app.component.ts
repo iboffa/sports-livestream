@@ -15,11 +15,10 @@ import { createGridLayout } from './entities/docked';
 import { Timer } from './entities/timer';
 
 @Component({
-  selector: 'app-root',
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss'],
-  standalone: true,
-  imports: [CommonModule, RouterModule, ReactiveFormsModule],
+    selector: 'app-root',
+    templateUrl: './app.component.html',
+    styleUrls: ['./app.component.scss'],
+    imports: [CommonModule, RouterModule, ReactiveFormsModule]
 })
 export class AppComponent implements AfterViewInit {
 
