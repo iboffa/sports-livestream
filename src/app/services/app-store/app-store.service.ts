@@ -5,8 +5,8 @@ import { Injectable } from '@angular/core';
 })
 export class AppStoreService {
 
-  get(prop: string){
-    window.appStore.get(prop)
+  get<T = unknown>(prop: string): T {
+    return window.appStore.get(prop);
   }
 
   set(prop: string, value: any){

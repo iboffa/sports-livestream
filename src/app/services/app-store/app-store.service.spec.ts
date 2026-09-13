@@ -37,4 +37,10 @@ describe('AppStoreService', () => {
     service.delete('some.value');
     expect(spyOnDelete).toHaveBeenCalledWith('some.value');
   });
+
+  it('returns the value held in the store', () => {
+    (window.appStore.get as jest.Mock).mockReturnValue('camera-abc');
+
+    expect(service.get('selectedCameraDeviceId')).toBe('camera-abc');
+  });
 });
