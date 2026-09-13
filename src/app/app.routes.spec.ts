@@ -5,11 +5,23 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from './app.routes';
 import { PreGameComponent } from './views/pre-game/pre-game.component';
 import { InGamePanelComponent } from './views/in-game/in-game-panel.component';
+import { AppStoreService } from './services/app-store/app-store.service';
+import { VideoService } from './services/video/video.service';
 
 describe('app routes', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideRouter(routes), provideLocationMocks()],
+      providers: [
+        provideRouter(routes),
+        provideLocationMocks(),
+        // PreGameComponent reads/writes app-store and probes cameras on init;
+        // this suite only cares about routing, so stub both out.
+        { provide: AppStoreService, useValue: { get: () => undefined, set: () => {} } },
+        {
+          provide: VideoService,
+          useValue: { groupCamerasByResolution: () => Promise.resolve({}) },
+        },
+      ],
     });
   });
 

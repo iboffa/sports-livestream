@@ -1,5 +1,32 @@
 <section class="panel-section" data-test="settings-section">
   <h2>Settings</h2>
+
+  <h3>Camera</h3>
+  @for (resolution of resolutions; track resolution) {
+    <div class="resolution-group">
+      <span class="resolution">{{ resolution }}</span>
+      @for (camera of cameraGroups()[resolution]; track camera.deviceId) {
+        <button
+          type="button"
+          class="device"
+          data-test="camera-option"
+          [class.selected]="camera.deviceId === selectedCameraId()"
+          (click)="selectCamera(camera.deviceId)"
+        >{{ camera.label }}</button>
+      }
+    </div>
+  }
+
+  @if (preview(); as stream) {
+    <video
+      class="preview"
+      data-test="camera-preview"
+      autoplay
+      muted
+      playsinline
+      [srcObject]="stream"
+    ></video>
+  }
 </section>
 
 <section class="panel-section" data-test="rosters-section">
