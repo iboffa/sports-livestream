@@ -56,3 +56,4 @@ Not yet implemented; noted here for direction when relevant work comes up.
 - Standardized in-game messages (player info, timeout called, yellow/red card, ...).
 - Streaming to YouTube/Facebook/Twitch/Instagram.
 - Multi-user collaboration on a single broadcast, with flexible per-user roles/capabilities (e.g. remote camera operator, scoreboard operator, director selecting scenes, messages operator, remote commentator).
+- Use pre-recorded videos and instant replays as a video source alongside live cameras.
