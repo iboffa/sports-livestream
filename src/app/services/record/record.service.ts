@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { AudioService } from '../audio/audio.service';
 
@@ -6,7 +6,7 @@ import { AudioService } from '../audio/audio.service';
   providedIn: 'root',
 })
 export class RecordService {
-  constructor(private audioService: AudioService) {}
+  private audioService = inject(AudioService);
 
   recording$: BehaviorSubject<boolean> = new BehaviorSubject(false);
   private mediaRecorder!: MediaRecorder;
