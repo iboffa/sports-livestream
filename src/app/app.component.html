@@ -1,7 +1,23 @@
-<div #container></div>
- <input type="text" [formControl]="textContent">
-@if (status() === 'running') {
-  <button (click)="stopTimer()">Stop</button>
-} @else if (status() === 'stopped') {
-  <button (click)="startTimer()">Start</button>
-}
+<div class="workspace">
+  <main class="stage">
+    <div #container></div>
+
+    <div class="stage-controls">
+      <input type="text" [formControl]="textContent">
+      @if (status() === 'running') {
+        <button (click)="stopTimer()">Stop</button>
+      } @else if (status() === 'stopped') {
+        <button (click)="startTimer()">Start</button>
+      }
+    </div>
+  </main>
+
+  <aside class="panel">
+    <nav class="view-tabs">
+      <a routerLink="/pre-game" routerLinkActive="active" data-test="nav-pre-game">Pre-Game</a>
+      <a routerLink="/in-game" routerLinkActive="active" data-test="nav-in-game">In-Game</a>
+    </nav>
+
+    <router-outlet />
+  </aside>
+</div>

@@ -1,0 +1,36 @@
+.workspace {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.stage-controls {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+.panel {
+  flex: 1;
+  min-width: 16rem;
+  max-width: 24rem;
+}
+
+.view-tabs {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+
+  a {
+    padding: 0.5rem 0.75rem;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+
+    &.active {
+      font-weight: 600;
+      border-bottom: 2px solid currentColor;
+    }
+  }
+}

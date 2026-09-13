@@ -7,6 +7,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Application, Container, Text } from 'pixi.js';
 import { map, Observable, startWith, tap } from 'rxjs';
 import { BoxedText } from './entities/boxed-text';
@@ -18,7 +19,7 @@ import { Timer } from './entities/timer';
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.scss'],
     changeDetection: ChangeDetectionStrategy.Eager,
-    imports: [ReactiveFormsModule]
+    imports: [ReactiveFormsModule, RouterOutlet, RouterLink, RouterLinkActive]
 })
 export class AppComponent implements AfterViewInit {
   textContent = new FormControl<string>('Example');

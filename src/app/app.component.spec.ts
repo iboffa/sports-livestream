@@ -98,4 +98,14 @@ describe('AppComponent', () => {
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.querySelector('input[type="text"]')).toBeTruthy();
   });
+
+  it('renders navigation to both views alongside the canvas', () => {
+    const fixture = TestBed.createComponent(AppComponent);
+    fixture.detectChanges();
+    const compiled = fixture.nativeElement as HTMLElement;
+
+    expect(compiled.querySelector('[data-test="nav-pre-game"]')).toBeTruthy();
+    expect(compiled.querySelector('[data-test="nav-in-game"]')).toBeTruthy();
+    expect(compiled.querySelector('router-outlet')).toBeTruthy();
+  });
 });
