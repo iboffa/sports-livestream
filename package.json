@@ -1,13 +1,16 @@
 {
   "name": "angular-template",
   "version": "0.0.0",
-  "main": "electron/main.js",
+  "main": "electron/main.mjs",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "concurrently -k \"ng serve\" \"npm run electron:dev-start\"",
     "build": "concurrently \"ng build --base-href=./\" \"npm run esbuild-electron\" ",
-    "electron:dev-start": "npm run esbuild-electron && wait-on http://localhost:4200 && cross-env NODE_ENV=dev electron ./dist/electron/main.js",
-    "esbuild-electron": "esbuild electron/main.ts electron/preload.ts --bundle --minify --outdir=dist/electron --platform=node --packages=external --tree-shaking=true --tsconfig=tsconfig.electron.json",
-    "electron": "npm run build && electron ./dist/electron/main.js",
+    "electron:dev-start": "npm run esbuild-electron && wait-on http://localhost:4200 && cross-env NODE_ENV=dev electron ./dist/electron/main.mjs",
+    "esbuild-electron": "esbuild electron/main.ts --bundle --minify --outdir=dist/electron --platform=node --packages=external --tree-shaking=true --tsconfig=tsconfig.electron.json --format=esm --out-extension:.js=.mjs && esbuild electron/preload.ts --bundle --minify --outdir=dist/electron --platform=node --packages=external --tree-shaking=true --tsconfig=tsconfig.electron.json",
+    "electron": "npm run build && electron ./dist/electron/main.mjs",
     "test": "jest --no-cache",
     "dist": "npm run build && electron-builder --dir",
     "pack": "npm run build && electron-builder --dir --win --x64",
@@ -23,7 +26,7 @@
     "@angular/platform-browser-dynamic": "^22.1.6",
     "@angular/router": "^22.1.6",
     "cross-env": "^7.0.3",
-    "electron-store": "^8.1.0",
+    "electron-store": "^11.0.2",
     "ffmpeg-installer": "^1.0.2",
     "pixi.js": "^7.1.1",
     "rxjs": "~7.5.0",

@@ -3,7 +3,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist/electron",
-    "module": "commonjs",
+    "module": "ES2022",
     "types": ["electron-builder", "node"],
     "sourceMap": false,
     "removeComments": true,

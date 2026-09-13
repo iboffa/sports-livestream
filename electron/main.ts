@@ -19,14 +19,14 @@ function createWindow() {
     width: 800,
     height: 600,
     webPreferences: {
-      preload: pathJoin(__dirname, './preload.js'),
+      preload: pathJoin(import.meta.dirname, './preload.js'),
     },
   });
 
   // Load the index.html of the app.
   if (process.env['NODE_ENV'] === 'dev') {
     win.loadURL('http://localhost:4200');
-  } else win.loadFile(pathJoin(__dirname, '../app/index.html'));
+  } else win.loadFile(pathJoin(import.meta.dirname, '../app/index.html'));
 }
 
 app.whenReady().then(createWindow);
