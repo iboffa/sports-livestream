@@ -1,8 +1,7 @@
 <div #container></div>
  <input type="text" [formControl]="textContent">
-<button *ngIf="(status$ | async) === 'running'" (click)="stopTimer()">
-  Stop
-</button>
-<button *ngIf="(status$ | async) === 'stopped'" (click)="startTimer()">
-  Start
-</button>
+@if (status() === 'running') {
+  <button (click)="stopTimer()">Stop</button>
+} @else if (status() === 'stopped') {
+  <button (click)="startTimer()">Start</button>
+}

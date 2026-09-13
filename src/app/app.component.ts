@@ -1,14 +1,12 @@
-import { CommonModule } from '@angular/common';
 import {
   AfterViewInit,
   Component,
   ElementRef,
-  NgZone,
-  ViewChild,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
+  viewChild,
 } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
 import { Application, Container, Text } from 'pixi.js';
 import { map, Observable, startWith, tap } from 'rxjs';
 import { BoxedText } from './entities/boxed-text';
@@ -20,13 +18,12 @@ import { Timer } from './entities/timer';
     templateUrl: './app.component.html',
     styleUrls: ['./app.component.scss'],
     changeDetection: ChangeDetectionStrategy.Eager,
-    imports: [CommonModule, RouterModule, ReactiveFormsModule]
+    imports: [ReactiveFormsModule]
 })
 export class AppComponent implements AfterViewInit {
-
   textContent = new FormControl<string>('Example');
 
-  @ViewChild('container') container!: ElementRef;
+  container = viewChild.required<ElementRef>('container');
   private pixiApp!: Application;
   private stage!: Container;
   private timer = new Timer(
@@ -46,8 +43,7 @@ export class AppComponent implements AfterViewInit {
         : `${time.seconds.toString().padStart(2, '0')}.${time.tenths}`
     )
   );
-  status$ = this.timer.state;
-  constructor(private ngZone: NgZone) {}
+  status = toSignal(this.timer.state, { initialValue: 'stopped' as const });
 
   async ngAfterViewInit() {
     this.pixiApp = new Application();
@@ -58,7 +54,7 @@ export class AppComponent implements AfterViewInit {
       antialias: true,
     });
     this.stage = new Container();
-    this.container.nativeElement.appendChild(this.pixiApp.canvas);
+    this.container().nativeElement.appendChild(this.pixiApp.canvas);
 
     const timeBox = new BoxedText({
       text: this.timer$,
@@ -86,8 +82,7 @@ export class AppComponent implements AfterViewInit {
     const block = createGridLayout([[timeBox, testName, testName2]]);
     this.stage.addChild(block);
 
-    this.ngZone.runOutsideAngular(() => this.animate());
-
+    this.animate();
   }
 
   startTimer() {
