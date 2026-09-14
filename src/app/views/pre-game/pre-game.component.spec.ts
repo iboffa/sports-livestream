@@ -107,6 +107,19 @@ describe('PreGameComponent', () => {
     expect(panel.querySelector('[data-test="camera-preview"]')).toBeTruthy();
   });
 
+  it('feeds the chosen camera stream into the preview element', async () => {
+    const fixture = await render();
+    const panel = fixture.nativeElement as HTMLElement;
+
+    panel.querySelectorAll<HTMLButtonElement>('[data-test="camera-option"]')[0].click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    const video = panel.querySelector<HTMLVideoElement>('[data-test="camera-preview"]');
+    expect(fixture.componentInstance.preview()).toBeTruthy();
+    expect(video?.srcObject).toBe(fixture.componentInstance.preview());
+  });
+
   it('shows a gain slider for every microphone', async () => {
     const fixture = await render();
     const panel = fixture.nativeElement as HTMLElement;
