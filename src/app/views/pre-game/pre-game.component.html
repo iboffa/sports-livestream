@@ -27,6 +27,22 @@
       [srcObject]="stream"
     ></video>
   }
+
+  <h3>Microphones</h3>
+  @for (entry of micInputs() | keyvalue; track entry.key) {
+    <label class="device">
+      <span>{{ entry.value.label }}</span>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        data-test="mic-gain"
+        [value]="gainOf(entry.key)"
+        (input)="setGain(entry.key, $any($event.target).value)"
+      >
+    </label>
+  }
 </section>
 
 <section class="panel-section" data-test="rosters-section">

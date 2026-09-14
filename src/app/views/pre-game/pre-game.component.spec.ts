@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
 import { PreGameComponent } from './pre-game.component';
 import { VideoService } from '../../services/video/video.service';
 import { AudioService } from '../../services/audio/audio.service';
@@ -12,8 +13,8 @@ const cameras = {
 describe('PreGameComponent', () => {
   let stored: { [key: string]: unknown };
 
-  const render = async () => {
-    stored = {};
+  const render = async (initialStore: { [key: string]: unknown } = {}) => {
+    stored = { ...initialStore };
     (navigator as any).mediaDevices = {
       getUserMedia: jest.fn().mockResolvedValue({ getTracks: () => [] }),
     };
@@ -25,7 +26,15 @@ describe('PreGameComponent', () => {
           provide: VideoService,
           useValue: { groupCamerasByResolution: jest.fn().mockResolvedValue(cameras) },
         },
-        { provide: AudioService, useValue: { audioInputs$: { subscribe: jest.fn() } } },
+        {
+          provide: AudioService,
+          useValue: {
+            audioInputs$: of({
+              'mic-1': { label: 'Headset', gainNode: { gain: { value: 0 } } },
+              'mic-2': { label: 'Ambient', gainNode: { gain: { value: 0 } } },
+            }),
+          },
+        },
         {
           provide: AppStoreService,
           useValue: {
@@ -96,5 +105,36 @@ describe('PreGameComponent', () => {
     fixture.detectChanges();
 
     expect(panel.querySelector('[data-test="camera-preview"]')).toBeTruthy();
+  });
+
+  it('shows a gain slider for every microphone', async () => {
+    const fixture = await render();
+    const panel = fixture.nativeElement as HTMLElement;
+
+    expect(panel.querySelectorAll('[data-test="mic-gain"]').length).toBe(2);
+  });
+
+  it('applies and persists a gain change', async () => {
+    const fixture = await render();
+    const panel = fixture.nativeElement as HTMLElement;
+
+    const slider = panel.querySelectorAll<HTMLInputElement>('[data-test="mic-gain"]')[0];
+    slider.value = '0.75';
+    slider.dispatchEvent(new Event('input'));
+    await fixture.whenStable();
+
+    expect(fixture.componentInstance.micInputs()['mic-1'].gainNode.gain.value).toBe(0.75);
+    expect(stored['micGains']).toEqual({ 'mic-1': 0.75 });
+  });
+
+  it('restores persisted gains onto the mixer', async () => {
+    const fixture = await render({ micGains: { 'mic-2': 0.4 } });
+    const panel = fixture.nativeElement as HTMLElement;
+
+    expect(fixture.componentInstance.micInputs()['mic-2'].gainNode.gain.value).toBe(0.4);
+    expect(fixture.componentInstance.micInputs()['mic-1'].gainNode.gain.value).toBe(0);
+
+    const sliders = panel.querySelectorAll<HTMLInputElement>('[data-test="mic-gain"]');
+    expect(sliders[1].value).toBe('0.4');
   });
 });

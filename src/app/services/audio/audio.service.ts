@@ -1,5 +1,18 @@
 import { Injectable } from '@angular/core';
-import { forkJoin, from, map, of, switchMap, tap, zip } from 'rxjs';
+import {
+  BehaviorSubject,
+  forkJoin,
+  from,
+  map,
+  of,
+  switchMap,
+  tap,
+  zip,
+} from 'rxjs';
+
+export type AudioInputs = {
+  [deviceId: string]: { gainNode: GainNode; label: string };
+};
 
 @Injectable({
   providedIn: 'root',
@@ -9,6 +22,10 @@ export class AudioService {
   private audioCtx = new AudioContext();
   private gains: { [deviceId: string]: { gainNode: GainNode; label: string } } =
     {};
+  private inputs = new BehaviorSubject<AudioInputs>({});
+
+  /** Emits once each device's stream has been connected to the mixer. */
+  readonly audioInputs$ = this.inputs.asObservable();
 
   get audioTrack(): MediaStreamTrack {
     return this.mixedAudioNode.stream.getAudioTracks()[0];
@@ -63,6 +80,7 @@ export class AudioService {
           audioSource.connect(this.gains[deviceId].gainNode);
           this.gains[deviceId].gainNode.connect(this.mixedAudioNode);
         });
+        this.inputs.next({ ...this.gains });
       });
   }
 

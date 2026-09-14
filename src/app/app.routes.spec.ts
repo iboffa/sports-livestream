@@ -6,7 +6,9 @@ import { routes } from './app.routes';
 import { PreGameComponent } from './views/pre-game/pre-game.component';
 import { InGamePanelComponent } from './views/in-game/in-game-panel.component';
 import { AppStoreService } from './services/app-store/app-store.service';
+import { AudioService } from './services/audio/audio.service';
 import { VideoService } from './services/video/video.service';
+import { of } from 'rxjs';
 
 describe('app routes', () => {
   beforeEach(() => {
@@ -14,13 +16,15 @@ describe('app routes', () => {
       providers: [
         provideRouter(routes),
         provideLocationMocks(),
-        // PreGameComponent reads/writes app-store and probes cameras on init;
-        // this suite only cares about routing, so stub both out.
+        // PreGameComponent reads/writes app-store, probes cameras on init and
+        // opens an AudioContext; this suite only cares about routing, so stub
+        // all three out.
         { provide: AppStoreService, useValue: { get: () => undefined, set: () => {} } },
         {
           provide: VideoService,
           useValue: { groupCamerasByResolution: () => Promise.resolve({}) },
         },
+        { provide: AudioService, useValue: { audioInputs$: of({}) } },
       ],
     });
   });
